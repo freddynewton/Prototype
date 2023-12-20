@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2c47228f0b0be98428dd75e3735fb33c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 251334
+  packageName: JU TPS 3 - Third Person Shooter GameKit + Vehicle Physics
+  packageVersion: 3.0.42
+  assetPath: Assets/Julhiecio TPS Controller/Prefabs/AI/Patrol AI Sample.prefab
+  uploadId: 608326
