@@ -593,7 +593,7 @@ namespace KinematicCharacterController
 
         private void Awake()
         {
-            _transform = this.transform;
+            _transform = transform;
             ValidateData();
 
             _transientPosition = _transform.position;
