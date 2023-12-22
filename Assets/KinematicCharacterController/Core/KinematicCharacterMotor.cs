@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Game.Data.CharacterInputData;
 using Game.Data.CharacterMovementData;
 
 namespace KinematicCharacterController
@@ -182,7 +181,7 @@ namespace KinematicCharacterController
         /// <summary>
         /// Contains the current grounding information
         /// </summary>
-        [System.NonSerialized]
+        [NonSerialized]
         public CharacterGroundingReport GroundingStatus = new CharacterGroundingReport();
         /// <summary>
         /// Contains the previous grounding information
@@ -315,7 +314,7 @@ namespace KinematicCharacterController
         // Private
         private RaycastHit[] _internalCharacterHits = new RaycastHit[MaxHitsBudget];
         private Collider[] _internalProbedColliders = new Collider[MaxCollisionBudget];
-        private List<Rigidbody> _rigidbodiesPushedThisMove = new List<Rigidbody>(16);
+        private List<Rigidbody> _rigidbodiesPushedThisMove = new(16);
         private RigidbodyProjectionHit[] _internalRigidbodyProjectionHits = new RigidbodyProjectionHit[MaxRigidbodyOverlapsCount];
         private Rigidbody _lastAttachedRigidbody;
         private bool _solveMovementCollisions = true;
@@ -324,8 +323,6 @@ namespace KinematicCharacterController
         private Vector3 _movePositionTarget = Vector3.zero;
         private bool _moveRotationDirty = false;
         private Quaternion _moveRotationTarget = Quaternion.identity;
-        private bool _lastSolvedOverlapNormalDirty = false;
-        private Vector3 _lastSolvedOverlapNormal = Vector3.forward;
         private int _rigidbodyProjectionHitCount = 0;
         private bool _isMovingFromAttachedRigidbody = false;
         private bool _mustUnground = false;
@@ -536,17 +533,19 @@ namespace KinematicCharacterController
         /// </summary>
         public KinematicCharacterMotorState GetState()
         {
-            KinematicCharacterMotorState state = new KinematicCharacterMotorState();
+            KinematicCharacterMotorState state = new()
+            {
+                Position = _transientPosition,
+                Rotation = _transientRotation,
 
-            state.Position = _transientPosition;
-            state.Rotation = _transientRotation;
+                BaseVelocity = BaseVelocity,
+                AttachedRigidbodyVelocity = _attachedRigidbodyVelocity,
 
-            state.BaseVelocity = BaseVelocity;
-            state.AttachedRigidbodyVelocity = _attachedRigidbodyVelocity;
+                MustUnground = _mustUnground,
+                MustUngroundTime = _mustUngroundTimeCounter,
+                LastMovementIterationFoundAnyGround = LastMovementIterationFoundAnyGround
+            };
 
-            state.MustUnground = _mustUnground;
-            state.MustUngroundTime = _mustUngroundTimeCounter;
-            state.LastMovementIterationFoundAnyGround = LastMovementIterationFoundAnyGround;
             state.GroundingStatus.CopyFrom(GroundingStatus);
             state.AttachedRigidbody = _attachedRigidbody;
 
@@ -652,7 +651,6 @@ namespace KinematicCharacterController
             _initialSimulationRotation = _transientRotation;
             _rigidbodyProjectionHitCount = 0;
             _overlapsCount = 0;
-            _lastSolvedOverlapNormalDirty = false;
 
             #region Handle Move Position
             if (_movePositionDirty)
@@ -678,8 +676,10 @@ namespace KinematicCharacterController
             #endregion
 
             LastGroundingStatus.CopyFrom(GroundingStatus);
-            GroundingStatus = new CharacterGroundingReport();
-            GroundingStatus.GroundNormal = _characterUp;
+            GroundingStatus = new CharacterGroundingReport
+            {
+                GroundNormal = _characterUp
+            };
 
             if (_solveMovementCollisions)
             {
@@ -712,8 +712,11 @@ namespace KinematicCharacterController
                                         out resolutionDistance))
                                 {
                                     // Resolve along obstruction direction
-                                    HitStabilityReport mockReport = new HitStabilityReport();
-                                    mockReport.IsStable = IsStableOnNormal(resolutionDirection);
+                                    HitStabilityReport mockReport = new()
+                                    {
+                                        IsStable = IsStableOnNormal(resolutionDirection)
+                                    };
+
                                     resolutionDirection = GetObstructionNormal(resolutionDirection, mockReport.IsStable);
 
                                     // Solve overlap
@@ -839,7 +842,7 @@ namespace KinematicCharacterController
                     _attachedRigidbodyVelocity = tmpVelocityFromCurrentAttachedRigidbody;
 
                     // Rotation from attached rigidbody
-                    Vector3 newForward = Vector3.ProjectOnPlane(Quaternion.Euler(Mathf.Rad2Deg * tmpAngularVelocityFromCurrentAttachedRigidbody * deltaTime) * _characterForward, _characterUp).normalized;
+                    Vector3 newForward = Vector3.ProjectOnPlane(Quaternion.Euler(deltaTime * Mathf.Rad2Deg * tmpAngularVelocityFromCurrentAttachedRigidbody) * _characterForward, _characterUp).normalized;
                     TransientRotation = Quaternion.LookRotation(newForward, _characterUp);
                 }
 
@@ -906,13 +909,12 @@ namespace KinematicCharacterController
                     {
                         float upwardsOffset = Capsule.radius;
 
-                        RaycastHit closestHit;
                         if (CharacterGroundSweep(
                             _transientPosition + (_characterUp * upwardsOffset),
                             _transientRotation,
                             -_characterUp,
                             upwardsOffset,
-                            out closestHit))
+                            out RaycastHit closestHit))
                         {
                             if (closestHit.collider.attachedRigidbody == _attachedRigidbody && IsStableOnNormal(closestHit.normal))
                             {
@@ -926,9 +928,8 @@ namespace KinematicCharacterController
 
                 if (InteractiveRigidbodyHandling)
                 {
+
                     #region Resolve overlaps that could've been caused by rotation or physics movers simulation pushing the character
-                    Vector3 resolutionDirection = _cachedWorldUp;
-                    float resolutionDistance = 0f;
                     int iterationsMade = 0;
                     bool overlapSolved = false;
                     while (iterationsMade < MaxDecollisionIterations && !overlapSolved)
@@ -947,12 +948,15 @@ namespace KinematicCharacterController
                                         _internalProbedColliders[i],
                                         overlappedTransform.position,
                                         overlappedTransform.rotation,
-                                        out resolutionDirection,
-                                        out resolutionDistance))
+                                        out Vector3 resolutionDirection,
+                                        out float resolutionDistance))
                                 {
                                     // Resolve along obstruction direction
-                                    HitStabilityReport mockReport = new HitStabilityReport();
-                                    mockReport.IsStable = IsStableOnNormal(resolutionDirection);
+                                    HitStabilityReport mockReport = new()
+                                    {
+                                        IsStable = IsStableOnNormal(resolutionDirection)
+                                    };
+
                                     resolutionDirection = GetObstructionNormal(resolutionDirection, mockReport.IsStable);
 
                                     // Solve overlap
@@ -965,15 +969,18 @@ namespace KinematicCharacterController
                                         Rigidbody probedRigidbody = GetInteractiveRigidbody(_internalProbedColliders[i]);
                                         if (probedRigidbody != null)
                                         {
-                                            HitStabilityReport tmpReport = new HitStabilityReport();
-                                            tmpReport.IsStable = IsStableOnNormal(resolutionDirection);
+                                            HitStabilityReport tmpReport = new()
+                                            {
+                                                IsStable = IsStableOnNormal(resolutionDirection)
+                                            };
+
                                             if (tmpReport.IsStable)
                                             {
                                                 LastMovementIterationFoundAnyGround = tmpReport.IsStable;
                                             }
                                             if (probedRigidbody != _attachedRigidbody)
                                             {
-                                                Vector3 characterCenter = _transientPosition + (_transientRotation * _characterTransformToCapsuleCenter);
+                                                _ = _transientPosition + (_transientRotation * _characterTransformToCapsuleCenter);
                                                 Vector3 estimatedCollisionPoint = _transientPosition;
 
 
@@ -1125,7 +1132,7 @@ namespace KinematicCharacterController
             }
 
             int groundSweepsMade = 0;
-            RaycastHit groundSweepHit = new RaycastHit();
+            _ = new RaycastHit();
             bool groundSweepingIsOver = false;
             Vector3 groundSweepPosition = probingPosition;
             Vector3 groundSweepDirection = (atRotation * -_cachedWorldUp);
@@ -1138,10 +1145,10 @@ namespace KinematicCharacterController
                         atRotation, // rotation
                         groundSweepDirection, // direction
                         groundProbeDistanceRemaining, // distance
-                        out groundSweepHit)) // hit
+                        out RaycastHit groundSweepHit)) // hit
                 {
                     Vector3 targetPosition = groundSweepPosition + (groundSweepDirection * groundSweepHit.distance);
-                    HitStabilityReport groundHitStabilityReport = new HitStabilityReport();
+                    HitStabilityReport groundHitStabilityReport = new();
                     EvaluateHitStability(groundSweepHit.collider, groundSweepHit.normal, groundSweepHit.point, targetPosition, _transientRotation, BaseVelocity, ref groundHitStabilityReport);
 
                     groundingReport.FoundAnyGround = true;
@@ -1172,8 +1179,8 @@ namespace KinematicCharacterController
                     else
                     {
                         // Calculate movement from this iteration and advance position
-                        Vector3 sweepMovement = (groundSweepDirection * groundSweepHit.distance) + ((atRotation * _cachedWorldUp) * Mathf.Max(CollisionOffset, groundSweepHit.distance));
-                        groundSweepPosition = groundSweepPosition + sweepMovement;
+                        Vector3 sweepMovement = (groundSweepDirection * groundSweepHit.distance) + (atRotation * _cachedWorldUp * Mathf.Max(CollisionOffset, groundSweepHit.distance));
+                        groundSweepPosition += sweepMovement;
 
                         // Set remaining distance
                         groundProbeDistanceRemaining = Mathf.Min(GroundProbeReboundDistance, Mathf.Max(groundProbeDistanceRemaining - sweepMovement.magnitude, 0f));
@@ -1347,12 +1354,12 @@ namespace KinematicCharacterController
                 if (foundClosestHit)
                 {
                     // Calculate movement from this iteration
-                    Vector3 sweepMovement = (remainingMovementDirection * (Mathf.Max(0f, closestSweepHitDistance - CollisionOffset)));
+                    Vector3 sweepMovement = (remainingMovementDirection * Mathf.Max(0f, closestSweepHitDistance - CollisionOffset));
                     tmpMovedPosition += sweepMovement;
                     remainingMovementMagnitude -= sweepMovement.magnitude;
 
                     // Evaluate if hit is stable
-                    HitStabilityReport moveHitStabilityReport = new HitStabilityReport();
+                    HitStabilityReport moveHitStabilityReport = new();
                     EvaluateHitStability(closestSweepHitCollider, closestSweepHitNormal, closestSweepHitPoint, tmpMovedPosition, _transientRotation, transientVelocity, ref moveHitStabilityReport);
 
                     // Handle stepping up steps points higher than bottom capsule radius
@@ -1363,8 +1370,7 @@ namespace KinematicCharacterController
                         if (obstructionCorrelation <= CorrelationForVerticalObstruction)
                         {
                             Vector3 stepForwardDirection = Vector3.ProjectOnPlane(-closestSweepHitNormal, _characterUp).normalized;
-                            Vector3 stepCastStartPoint = (tmpMovedPosition + (stepForwardDirection * SteppingForwardDistance)) +
-                                (_characterUp * MaxStepHeight);
+                            Vector3 stepCastStartPoint = tmpMovedPosition + (stepForwardDirection * SteppingForwardDistance) + (_characterUp * MaxStepHeight);
 
                             // Cast downward from the top of the stepping height
                             int nbStepHits = CharacterCollisionsSweep(
@@ -1372,7 +1378,7 @@ namespace KinematicCharacterController
                                                 _transientRotation, // rotation
                                                 -_characterUp, // direction
                                                 MaxStepHeight, // distance
-                                                out RaycastHit closestStepHit, // closest hit
+                                                out _, // closest hit
                                                 _internalCharacterHits,
                                                 0f,
                                                 true); // all hits 
@@ -1461,7 +1467,7 @@ namespace KinematicCharacterController
             }
 
             // Move position for the remainder of the movement
-            tmpMovedPosition += (remainingMovementDirection * remainingMovementMagnitude);
+            tmpMovedPosition += remainingMovementDirection * remainingMovementMagnitude;
             _transientPosition = tmpMovedPosition;
 
             return wasCompleted;
@@ -1498,12 +1504,14 @@ namespace KinematicCharacterController
             {
                 if (!hitRigidbody.GetComponent<KinematicCharacterMotor>())
                 {
-                    RigidbodyProjectionHit rph = new RigidbodyProjectionHit();
-                    rph.Rigidbody = hitRigidbody;
-                    rph.HitPoint = hitPoint;
-                    rph.EffectiveHitNormal = obstructionNormal;
-                    rph.HitVelocity = hitVelocity;
-                    rph.StableOnHit = hitStabilityReport.IsStable;
+                    RigidbodyProjectionHit rph = new()
+                    {
+                        Rigidbody = hitRigidbody,
+                        HitPoint = hitPoint,
+                        EffectiveHitNormal = obstructionNormal,
+                        HitVelocity = hitVelocity,
+                        StableOnHit = hitStabilityReport.IsStable
+                    };
 
                     _internalRigidbodyProjectionHits[_rigidbodyProjectionHitCount] = rph;
                     _rigidbodyProjectionHitCount++;
@@ -1711,12 +1719,12 @@ namespace KinematicCharacterController
                         KinematicCharacterMotor hitCharacterMotor = bodyHit.Rigidbody.GetComponent<KinematicCharacterMotor>();
                         bool hitBodyIsCharacter = hitCharacterMotor != null;
                         bool hitBodyIsDynamic = !bodyHit.Rigidbody.isKinematic;
-                        float hitBodyMass = bodyHit.Rigidbody.mass;
+                        _ = bodyHit.Rigidbody.mass;
                         float hitBodyMassAtPoint = bodyHit.Rigidbody.mass; // todo
                         Vector3 hitBodyVelocity = bodyHit.Rigidbody.velocity;
                         if (hitBodyIsCharacter)
                         {
-                            hitBodyMass = hitCharacterMotor.SimulatedCharacterMass;
+                            _ = hitCharacterMotor.SimulatedCharacterMass;
                             hitBodyMassAtPoint = hitCharacterMotor.SimulatedCharacterMass; // todo
                             hitBodyVelocity = hitCharacterMotor.BaseVelocity;
                         }
@@ -1730,7 +1738,7 @@ namespace KinematicCharacterController
                         }
 
                         // Calculate the ratio of the total mass that the character mass represents
-                        float characterToBodyMassRatio = 1f;
+                        float characterToBodyMassRatio;
                         {
                             if (characterMass + hitBodyMassAtPoint > 0f)
                             {
@@ -1969,27 +1977,24 @@ namespace KinematicCharacterController
 
         private void DetectSteps(Vector3 characterPosition, Quaternion characterRotation, Vector3 hitPoint, Vector3 innerHitDirection, ref HitStabilityReport stabilityReport)
         {
-            int nbStepHits = 0;
-            Collider tmpCollider;
-            RaycastHit outerStepHit;
             Vector3 characterUp = characterRotation * _cachedWorldUp;
-            Vector3 verticalCharToHit = Vector3.Project((hitPoint - characterPosition), characterUp);
-            Vector3 horizontalCharToHitDirection = Vector3.ProjectOnPlane((hitPoint - characterPosition), characterUp).normalized;
-            Vector3 stepCheckStartPos = (hitPoint - verticalCharToHit) + (characterUp * MaxStepHeight) + (horizontalCharToHitDirection * CollisionOffset * 3f); 
+            Vector3 verticalCharToHit = Vector3.Project(hitPoint - characterPosition, characterUp);
+            Vector3 horizontalCharToHitDirection = Vector3.ProjectOnPlane(hitPoint - characterPosition, characterUp).normalized;
+            Vector3 stepCheckStartPos = hitPoint - verticalCharToHit + (characterUp * MaxStepHeight) + (3f * CollisionOffset * horizontalCharToHitDirection);
 
             // Do outer step check with capsule cast on hit point
-            nbStepHits = CharacterCollisionsSweep(
+            int nbStepHits = CharacterCollisionsSweep(
                             stepCheckStartPos,
                             characterRotation,
                             -characterUp,
                             MaxStepHeight + CollisionOffset,
-                            out outerStepHit,
+                            out _,
                             _internalCharacterHits,
                             0f,
                             true);
 
             // Check for overlaps and obstructions at the hit position
-            if (CheckStepValidity(nbStepHits, characterPosition, characterRotation, innerHitDirection, stepCheckStartPos, out tmpCollider))
+            if (CheckStepValidity(nbStepHits, characterPosition, characterRotation, innerHitDirection, stepCheckStartPos, out Collider tmpCollider))
             {
                 stabilityReport.ValidStepDetected = true;
                 stabilityReport.SteppedCollider = tmpCollider;
@@ -2004,7 +2009,7 @@ namespace KinematicCharacterController
                                 characterRotation,
                                 -characterUp,
                                 MaxStepHeight - CollisionOffset,
-                                out outerStepHit,
+                                out _,
                                 _internalCharacterHits,
                                 0f,
                                 true);
@@ -2029,7 +2034,7 @@ namespace KinematicCharacterController
             while (nbStepHits > 0 && !foundValidStepPosition)
             {
                 // Get farthest hit among the remaining hits
-                RaycastHit farthestHit = new RaycastHit();
+                RaycastHit farthestHit = new();
                 float farthestDistance = 0f;
                 int farthestIndex = 0;
                 for (int i = 0; i < nbStepHits; i++)
@@ -2065,7 +2070,7 @@ namespace KinematicCharacterController
                                                 characterRotation, // rotation
                                                 characterUp, // direction
                                                 MaxStepHeight - farthestHit.distance, // distance
-                                                out RaycastHit tmpUpObstructionHit, // closest hit
+                                                out _, // closest hit
                                                 _internalCharacterHits) // all hits
                                     <= 0)
                             {
@@ -2117,7 +2122,6 @@ namespace KinematicCharacterController
                                 if (innerStepValid)
                                 {
                                     hitCollider = farthestHit.collider;
-                                    foundValidStepPosition = true;
                                     return true;
                                 }
                             }
@@ -2163,7 +2167,7 @@ namespace KinematicCharacterController
                     Vector3 centerOfRotation = interactiveRigidbody.transform.TransformPoint(interactiveRigidbody.centerOfMass);
 
                     Vector3 centerOfRotationToPoint = atPoint - centerOfRotation;
-                    Quaternion rotationFromInteractiveRigidbody = Quaternion.Euler(Mathf.Rad2Deg * angularVelocity * deltaTime);
+                    Quaternion rotationFromInteractiveRigidbody = Quaternion.Euler(deltaTime * Mathf.Rad2Deg * angularVelocity);
                     Vector3 finalPointPosition = centerOfRotation + (rotationFromInteractiveRigidbody * centerOfRotationToPoint);
                     linearVelocity += (finalPointPosition - atPoint) / deltaTime;
                 }
@@ -2249,11 +2253,10 @@ namespace KinematicCharacterController
             Vector3 top = position + (rotation * _characterTransformToCapsuleTopHemi);
             if (inflate != 0f)
             {
-                bottom += (rotation * Vector3.down * inflate);
-                top += (rotation * Vector3.up * inflate);
+                bottom += rotation * Vector3.down * inflate;
+                top += rotation * Vector3.up * inflate;
             }
 
-            int nbHits = 0;
             int nbUnfilteredHits = Physics.OverlapCapsuleNonAlloc(
                         bottom,
                         top,
@@ -2263,7 +2266,7 @@ namespace KinematicCharacterController
                         QueryTriggerInteraction.Ignore);
 
             // Filter out invalid colliders
-            nbHits = nbUnfilteredHits;
+            int nbHits = nbUnfilteredHits;
             for (int i = nbUnfilteredHits - 1; i >= 0; i--)
             {
                 if (!CheckIfColliderValidForCollisions(overlappedColliders[i]))
@@ -2289,11 +2292,10 @@ namespace KinematicCharacterController
             Vector3 top = position + (rotation * _characterTransformToCapsuleTopHemi);
             if (inflate != 0f)
             {
-                bottom += (rotation * Vector3.down * inflate);
-                top += (rotation * Vector3.up * inflate);
+                bottom += rotation * Vector3.down * inflate;
+                top += rotation * Vector3.up * inflate;
             }
 
-            int nbHits = 0;
             int nbUnfilteredHits = Physics.OverlapCapsuleNonAlloc(
                         bottom,
                         top,
@@ -2303,7 +2305,7 @@ namespace KinematicCharacterController
                         triggerInteraction);
 
             // Filter out the character capsule itself
-            nbHits = nbUnfilteredHits;
+            int nbHits = nbUnfilteredHits;
             for (int i = nbUnfilteredHits - 1; i >= 0; i--)
             {
                 if (overlappedColliders[i] == Capsule)
@@ -2335,12 +2337,10 @@ namespace KinematicCharacterController
             Vector3 top = position + (rotation * _characterTransformToCapsuleTopHemi) - (direction * SweepProbingBackstepDistance);
             if (inflate != 0f)
             {
-                bottom += (rotation * Vector3.down * inflate);
-                top += (rotation * Vector3.up * inflate);
+                bottom += rotation * Vector3.down * inflate;
+                top += rotation * Vector3.up * inflate;
             }
 
-            // Capsule cast
-            int nbHits = 0;
             int nbUnfilteredHits = Physics.CapsuleCastNonAlloc(
                     bottom,
                     top,
@@ -2354,7 +2354,8 @@ namespace KinematicCharacterController
             // Hits filter
             closestHit = new RaycastHit();
             float closestDistance = Mathf.Infinity;
-            nbHits = nbUnfilteredHits;
+            // Capsule cast
+            int nbHits = nbUnfilteredHits;
             for (int i = nbUnfilteredHits - 1; i >= 0; i--)
             {
                 hits[i].distance -= SweepProbingBackstepDistance;
@@ -2397,12 +2398,10 @@ namespace KinematicCharacterController
             Vector3 top = position + (rotation * _characterTransformToCapsuleTopHemi);
             if (inflate != 0f)
             {
-                bottom += (rotation * Vector3.down * inflate);
-                top += (rotation * Vector3.up * inflate);
+                bottom += rotation * Vector3.down * inflate;
+                top += rotation * Vector3.up * inflate;
             }
 
-            // Capsule cast
-            int nbHits = 0;
             int nbUnfilteredHits = Physics.CapsuleCastNonAlloc(
                 bottom,
                 top,
@@ -2415,7 +2414,8 @@ namespace KinematicCharacterController
 
             // Hits filter
             float closestDistance = Mathf.Infinity;
-            nbHits = nbUnfilteredHits;
+            // Capsule cast
+            int nbHits = nbUnfilteredHits;
             for (int i = nbUnfilteredHits - 1; i >= 0; i--)
             {
                 RaycastHit hit = hits[i];
@@ -2500,8 +2500,6 @@ namespace KinematicCharacterController
                 queryLayers = CollidableLayers & StableGroundLayers;
             }
 
-            // Raycast
-            int nbHits = 0;
             int nbUnfilteredHits = Physics.RaycastNonAlloc(
                 position,
                 direction,
@@ -2513,7 +2511,9 @@ namespace KinematicCharacterController
             // Hits filter
             closestHit = new RaycastHit();
             float closestDistance = Mathf.Infinity;
-            nbHits = nbUnfilteredHits;
+
+            // Raycast
+            int nbHits = nbUnfilteredHits;
             for (int i = nbUnfilteredHits - 1; i >= 0; i--)
             {
                 RaycastHit hit = hits[i];
