@@ -1,4 +1,5 @@
 ﻿using Game.Data;
+using Game.Data.CharacterInputData;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;

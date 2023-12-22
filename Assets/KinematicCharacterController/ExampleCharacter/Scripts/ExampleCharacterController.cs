@@ -1,4 +1,6 @@
 ﻿using Game.Data;
+using Game.Data.CharacterInputData;
+using Game.Data.CharacterMovementData;
 using System.Collections.Generic;
 using UnityEngine;
 

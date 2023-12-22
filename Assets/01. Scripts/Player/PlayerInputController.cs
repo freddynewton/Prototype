@@ -1,5 +1,5 @@
 using Game.Character;
-using Game.Data;
+using Game.Data.CharacterInputData;
 using KinematicCharacterController;
 using UnityEngine;
 using UnityEngine.InputSystem;

@@ -1,4 +1,5 @@
 ﻿using Game.Data;
+using Game.Data.CharacterInputData;
 using UnityEngine;
 
 namespace KinematicCharacterController.Examples
