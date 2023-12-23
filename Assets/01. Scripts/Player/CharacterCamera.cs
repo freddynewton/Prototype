@@ -8,7 +8,7 @@ namespace Game.Character
     {
         [Header("Framing")]
         public Camera Camera;
-        public Vector2 FollowPointFraming = new Vector2(0f, 0f);
+        public Vector2 FollowPointFraming = new(0f, 0f);
         public float FollowingSharpness = 10000f;
 
         [Header("Distance")]
@@ -164,7 +164,7 @@ namespace Game.Character
                 }
 
                 // Find the smoothed camera orbit position
-                Vector3 targetPosition = _currentFollowPosition - ((targetRotation * Vector3.forward) * _currentDistance);
+                Vector3 targetPosition = _currentFollowPosition - (targetRotation * Vector3.forward * _currentDistance);
 
                 // Handle framing
                 targetPosition += Transform.right * FollowPointFraming.x;

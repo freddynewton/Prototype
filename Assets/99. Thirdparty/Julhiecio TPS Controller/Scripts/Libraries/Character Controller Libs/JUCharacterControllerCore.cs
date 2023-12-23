@@ -324,6 +324,7 @@ namespace JUTPS.CharacterBrain
                 }
             }
         }
+
         public Vector3 GetLookDirectionEulerAngles()
         {
             Vector3 lookdir = Quaternion.LookRotation(LookAtPosition - PivotItemRotation.transform.position).eulerAngles;

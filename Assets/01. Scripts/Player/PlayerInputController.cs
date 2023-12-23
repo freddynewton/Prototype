@@ -12,9 +12,11 @@ namespace Game.Player
         [SerializeField]
         private InputActionAsset inputActions;
 
+        public Character.CharacterController CharacterController { get => characterController; }
         [SerializeField]
         private Character.CharacterController characterController;
 
+        public CharacterCamera CharacterCamera { get => characterCamera; }
         [SerializeField]
         private CharacterCamera characterCamera;
 
@@ -28,11 +30,13 @@ namespace Game.Player
         private InputAction primaryAction;
         private InputAction secondaryAction;
         private InputAction zoomAction;
+        private InputAction jumpAction;
 
         // Input Values
         private Vector2 lookInput;
         private Vector2 moveInput;
         private float zoomInput;
+        private bool jumpInput;
 
         // State
         private bool isInitialized;
@@ -67,6 +71,7 @@ namespace Game.Player
             primaryAction = playerActionMap.FindAction("Primary");
             secondaryAction = playerActionMap.FindAction("Secondary");
             zoomAction = playerActionMap.FindAction("Zoom");
+            jumpAction = playerActionMap.FindAction("Jump");
 
             inputActions.Enable();
 
@@ -91,11 +96,10 @@ namespace Game.Player
 
             moveInput = Vector2.zero;
             lookInput = Vector2.zero;
-            zoomInput = 0f;
 
             moveInput = moveAction.ReadValue<Vector2>();
             lookInput = lookAction.ReadValue<Vector2>();
-            // zoomInput = -zoomAction.ReadValue<float>();
+            jumpInput = jumpAction.IsPressed();
 
             // Handle player movement
             HandleCharacterInput();
@@ -126,7 +130,10 @@ namespace Game.Player
                 // Build the CharacterInputs struct
                 MoveAxisForward = moveInput.y,
                 MoveAxisRight = moveInput.x,
-                CameraRotation = characterCamera.Transform.rotation
+                CameraRotation = characterCamera.Transform.rotation,
+                JumpDown = jumpInput,
+                CrouchDown = false,
+                CrouchUp = false,
             };
 
             // Apply inputs to character

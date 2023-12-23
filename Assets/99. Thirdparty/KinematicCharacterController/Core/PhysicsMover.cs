@@ -1,23 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using Game.Data.CharacterPhysicsMoverStateData;
+using System;
 using UnityEngine;
 
 namespace KinematicCharacterController
 {
-    /// <summary>
-    /// Represents the entire state of a PhysicsMover that is pertinent for simulation.
-    /// Use this to save state or revert to past state
-    /// </summary>
-    [System.Serializable]
-    public struct PhysicsMoverState
-    {
-        public Vector3 Position;
-        public Quaternion Rotation;
-        public Vector3 Velocity;
-        public Vector3 AngularVelocity;
-    }
-
     /// <summary>
     /// Component that manages the movement of moving kinematic rigidbodies for
     /// proper interaction with characters
@@ -219,12 +205,13 @@ namespace KinematicCharacterController
         /// </summary>
         public PhysicsMoverState GetState()
         {
-            PhysicsMoverState state = new PhysicsMoverState();
-
-            state.Position = TransientPosition;
-            state.Rotation = TransientRotation;
-            state.Velocity = Velocity;
-            state.AngularVelocity = AngularVelocity;
+            PhysicsMoverState state = new()
+            {
+                Position = TransientPosition,
+                Rotation = TransientRotation,
+                Velocity = Velocity,
+                AngularVelocity = AngularVelocity
+            };
 
             return state;
         }
@@ -253,7 +240,7 @@ namespace KinematicCharacterController
             {
                 Velocity = (TransientPosition - InitialSimulationPosition) / deltaTime;
                                 
-                Quaternion rotationFromCurrentToGoal = TransientRotation * (Quaternion.Inverse(InitialSimulationRotation));
+                Quaternion rotationFromCurrentToGoal = TransientRotation * Quaternion.Inverse(InitialSimulationRotation);
                 AngularVelocity = (Mathf.Deg2Rad * rotationFromCurrentToGoal.eulerAngles) / deltaTime;
             }
         }

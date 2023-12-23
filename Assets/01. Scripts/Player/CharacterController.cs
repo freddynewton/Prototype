@@ -30,18 +30,49 @@ namespace Game.Character
         public float JumpPostGroundingGraceTime = 0f;
 
         [Header("Misc")]
-        public List<Collider> IgnoredColliders = new List<Collider>();
+        public List<Collider> IgnoredColliders = new();
         public BonusOrientationMethod BonusOrientationMethod = BonusOrientationMethod.None;
         public float BonusOrientationSharpness = 10f;
-        public Vector3 Gravity = new Vector3(0, -30f, 0);
+        public Vector3 Gravity = new(0, -30f, 0);
         public Transform MeshRoot;
         public Transform CameraFollowPoint;
         public float CrouchedCapsuleHeight = 1f;
 
         public CharacterState CurrentCharacterState { get; private set; }
 
+        /// <summary>
+        /// The current velocity of the character
+        /// </summary>
+        public Vector3 MoveInputAxis { get { return _moveInputVector; } }
+
+        /// <summary>
+        /// The smoothed look input vector in world space
+        /// </summary>
+        public Vector3 LookInputAxis { get { return _lookInputVector; } }
+
+        /// <summary>
+        /// Check if the CharacterController is moving according to its movement speed threshold
+        /// </summary>
+        public bool IsMoving
+        {
+            get
+            {
+                return Motor.Velocity.magnitude > 0f;
+            }
+        }
+
+        /// <summary>
+        /// Check if the CharacterController is stable (Grounded and not falling)
+        /// </summary>
+        public bool IsGrounded
+        {
+            get
+            {
+                return Motor.GroundingStatus.IsStableOnGround;
+            }
+        }
+
         private Collider[] _probedColliders = new Collider[8];
-        private RaycastHit[] _probedHits = new RaycastHit[8];
         private Vector3 _moveInputVector;
         private Vector3 _lookInputVector;
         private bool _jumpRequested = false;
@@ -53,8 +84,6 @@ namespace Game.Character
         private bool _shouldBeCrouching = false;
         private bool _isCrouching = false;
 
-        private Vector3 lastInnerNormal = Vector3.zero;
-        private Vector3 lastOuterNormal = Vector3.zero;
 
         private void Awake()
         {
@@ -114,52 +143,20 @@ namespace Game.Character
 
             // Calculate camera direction and rotation on the character plane
             Vector3 cameraPlanarDirection = Vector3.ProjectOnPlane(inputs.CameraRotation * Vector3.forward, Motor.CharacterUp).normalized;
+
+            // If there is an input direction, rotate the character to it
             if (cameraPlanarDirection.sqrMagnitude == 0f)
             {
                 cameraPlanarDirection = Vector3.ProjectOnPlane(inputs.CameraRotation * Vector3.up, Motor.CharacterUp).normalized;
             }
+
             Quaternion cameraPlanarRotation = Quaternion.LookRotation(cameraPlanarDirection, Motor.CharacterUp);
 
             switch (CurrentCharacterState)
             {
                 case CharacterState.Default:
                     {
-                        // Move and look inputs
-                        _moveInputVector = cameraPlanarRotation * moveInputVector;
-
-                        switch (OrientationMethod)
-                        {
-                            case OrientationMethod.TowardsCamera:
-                                _lookInputVector = cameraPlanarDirection;
-                                break;
-                            case OrientationMethod.TowardsMovement:
-                                _lookInputVector = _moveInputVector.normalized;
-                                break;
-                        }
-
-                        // Jumping input
-                        if (inputs.JumpDown)
-                        {
-                            _timeSinceJumpRequested = 0f;
-                            _jumpRequested = true;
-                        }
-
-                        // Crouching input
-                        if (inputs.CrouchDown)
-                        {
-                            _shouldBeCrouching = true;
-
-                            if (!_isCrouching)
-                            {
-                                _isCrouching = true;
-                                Motor.SetCapsuleDimensions(0.5f, CrouchedCapsuleHeight, CrouchedCapsuleHeight * 0.5f);
-                                MeshRoot.localScale = new Vector3(1f, 0.5f, 1f);
-                            }
-                        }
-                        else if (inputs.CrouchUp)
-                        {
-                            _shouldBeCrouching = false;
-                        }
+                        SetInputsDefault(inputs, moveInputVector, cameraPlanarDirection, cameraPlanarRotation);
 
                         break;
                     }
@@ -174,8 +171,6 @@ namespace Game.Character
             _moveInputVector = inputs.MoveVector;
             _lookInputVector = inputs.LookVector;
         }
-
-        private Quaternion _tmpTransientRot;
 
         /// <summary>
         /// (Called by KinematicCharacterMotor during its update cycle)
@@ -319,6 +314,7 @@ namespace Game.Character
                         // Handle jumping
                         _jumpedThisFrame = false;
                         _timeSinceJumpRequested += deltaTime;
+                            Debug.Log(_timeSinceLastAbleToJump);
                         if (_jumpRequested)
                         {
                             // See if we actually are allowed to jump
@@ -337,7 +333,7 @@ namespace Game.Character
 
                                 // Add to the return velocity and reset jump state
                                 currentVelocity += (jumpDirection * JumpUpSpeed) - Vector3.Project(currentVelocity, Motor.CharacterUp);
-                                currentVelocity += (_moveInputVector * JumpScalableForwardSpeed);
+                                currentVelocity += _moveInputVector * JumpScalableForwardSpeed;
                                 _jumpRequested = false;
                                 _jumpConsumed = true;
                                 _jumpedThisFrame = true;
@@ -468,6 +464,10 @@ namespace Game.Character
         {
         }
 
+        public void OnDiscreteCollisionDetected(Collider hitCollider)
+        {
+        }
+
         protected void OnLanded()
         {
         }
@@ -476,8 +476,54 @@ namespace Game.Character
         {
         }
 
-        public void OnDiscreteCollisionDetected(Collider hitCollider)
+        private void SetInputsDefault(PlayerCharacterInputs inputs, Vector3 moveInputVector, Vector3 cameraPlanarDirection, Quaternion cameraPlanarRotation)
         {
+            // Move and look inputs
+            _moveInputVector = cameraPlanarRotation * moveInputVector;
+
+            switch (OrientationMethod)
+            {
+                case OrientationMethod.TowardsCamera:
+                    _lookInputVector = cameraPlanarDirection;
+                    break;
+                case OrientationMethod.TowardsMovement:
+                    _lookInputVector = _moveInputVector.normalized;
+                    break;
+            }
+
+            // Jumping input
+            SetJumpInput(inputs);
+
+            // Crouching input
+            SetCrouchInput(inputs);
+        }
+
+        private void SetCrouchInput(PlayerCharacterInputs inputs)
+        {
+            if (inputs.CrouchDown)
+            {
+                _shouldBeCrouching = true;
+
+                if (!_isCrouching)
+                {
+                    _isCrouching = true;
+                    Motor.SetCapsuleDimensions(0.5f, CrouchedCapsuleHeight, CrouchedCapsuleHeight * 0.5f);
+                    MeshRoot.localScale = new Vector3(1f, 0.5f, 1f);
+                }
+            }
+            else if (inputs.CrouchUp)
+            {
+                _shouldBeCrouching = false;
+            }
+        }
+
+        private void SetJumpInput(PlayerCharacterInputs inputs)
+        {
+            if (inputs.JumpDown)
+            {
+                _timeSinceJumpRequested = 0f;
+                _jumpRequested = true;
+            }
         }
     }
 }

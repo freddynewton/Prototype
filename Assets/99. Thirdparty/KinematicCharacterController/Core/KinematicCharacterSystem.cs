@@ -13,8 +13,8 @@ namespace KinematicCharacterController
     {
         private static KinematicCharacterSystem _instance;
 
-        public static List<KinematicCharacterMotor> CharacterMotors = new List<KinematicCharacterMotor>();
-        public static List<PhysicsMover> PhysicsMovers = new List<PhysicsMover>();
+        public static List<KinematicCharacterMotor> CharacterMotors = new();
+        public static List<PhysicsMover> PhysicsMovers = new();
 
         private static float _lastCustomInterpolationStartTime = -1f;
         private static float _lastCustomInterpolationDeltaTime = -1f;
