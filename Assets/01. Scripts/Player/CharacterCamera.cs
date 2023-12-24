@@ -7,7 +7,7 @@ namespace Game.Character
     public class CharacterCamera : MonoBehaviour
     {
         [Header("Framing")]
-        public Camera Camera;
+        public UnityEngine.Camera Camera;
         public Vector2 FollowPointFraming = new(0f, 0f);
         public float FollowingSharpness = 10000f;
 

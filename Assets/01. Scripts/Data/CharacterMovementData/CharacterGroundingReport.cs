@@ -17,6 +17,8 @@ namespace Game.Data.CharacterMovementData
         public Collider GroundCollider;
         public Vector3 GroundPoint;
 
+        public float TimeSinceGrounded;
+
         public void CopyFrom(CharacterTransientGroundingReport transientGroundingReport)
         {
             FoundAnyGround = transientGroundingReport.FoundAnyGround;
@@ -25,6 +27,7 @@ namespace Game.Data.CharacterMovementData
             GroundNormal = transientGroundingReport.GroundNormal;
             InnerGroundNormal = transientGroundingReport.InnerGroundNormal;
             OuterGroundNormal = transientGroundingReport.OuterGroundNormal;
+            TimeSinceGrounded = transientGroundingReport.TimeSinceGrounded;
 
             GroundCollider = null;
             GroundPoint = Vector3.zero;

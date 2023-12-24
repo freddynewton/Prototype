@@ -1,6 +1,6 @@
 using Game.Character;
+using Game.Character.Camera;
 using Game.Data.CharacterInputData;
-using KinematicCharacterController;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -12,13 +12,13 @@ namespace Game.Player
         [SerializeField]
         private InputActionAsset inputActions;
 
-        public Character.CharacterController CharacterController { get => characterController; }
+        public CharacterMovement CharacterMovementController { get => characterMovementController; }
         [SerializeField]
-        private Character.CharacterController characterController;
+        private CharacterMovement characterMovementController;
 
-        public CharacterCamera CharacterCamera { get => characterCamera; }
+        public CharacterCameraController CharacterCameraController { get => characterCameraController; }
         [SerializeField]
-        private CharacterCamera characterCamera;
+        private CharacterCameraController characterCameraController;
 
         // Action Maps
         private InputActionMap playerActionMap;
@@ -77,13 +77,6 @@ namespace Game.Player
 
             Cursor.lockState = CursorLockMode.Locked;
 
-            // Tell camera to follow transform
-            characterCamera.SetFollowTransform(characterController.CameraFollowPoint);
-
-            // Ignore the character's collider(s) for camera obstruction checks
-            characterCamera.IgnoredColliders.Clear();
-            characterCamera.IgnoredColliders.AddRange(characterController.GetComponentsInChildren<Collider>());
-
             isInitialized = true;
         }
 
@@ -103,41 +96,15 @@ namespace Game.Player
 
             // Handle player movement
             HandleCharacterInput();
-        }
 
-        private void LateUpdate()
-        {
-            if (!isInitialized || Cursor.lockState != CursorLockMode.Locked)
-            {
-                return;
-            }
-
-            // Handle rotating the camera along with physics movers
-            if (characterCamera.RotateWithPhysicsMover && characterController.Motor.AttachedRigidbody != null)
-            {
-                characterCamera.PlanarDirection = characterController.Motor.AttachedRigidbody.GetComponent<PhysicsMover>().RotationDeltaFromInterpolation * characterCamera.PlanarDirection;
-                characterCamera.PlanarDirection = Vector3.ProjectOnPlane(characterCamera.PlanarDirection, characterController.Motor.CharacterUp).normalized;
-            }
-
-            // Apply inputs to the camera
-            characterCamera.UpdateWithInput(Time.deltaTime, zoomInput, lookInput);
+            // Handle player camera
+            characterCameraController.HandleLookInputVertically(lookInput.y);
         }
 
         private void HandleCharacterInput()
         {
-            PlayerCharacterInputs characterInputs = new()
-            {
-                // Build the CharacterInputs struct
-                MoveAxisForward = moveInput.y,
-                MoveAxisRight = moveInput.x,
-                CameraRotation = characterCamera.Transform.rotation,
-                JumpDown = jumpInput,
-                CrouchDown = false,
-                CrouchUp = false,
-            };
-
-            // Apply inputs to character
-            characterController.SetInputs(ref characterInputs);
+            Vector3 moveDirection = new Vector3(moveInput.x, 0f, moveInput.y);
+            characterMovementController.HandleMovementInput(moveDirection);
         }
     }
 }

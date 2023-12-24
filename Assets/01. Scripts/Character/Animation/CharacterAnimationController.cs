@@ -12,7 +12,7 @@ namespace Game.Character.Animation
         private Animator Animator;
 
         [SerializeField]
-        private CharacterController CharacterController;
+        private CharacterMovementController CharacterController;
 
         [SerializeField]
         private CharacterCoreController CharacterCoreController;

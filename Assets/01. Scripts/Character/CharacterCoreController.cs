@@ -21,7 +21,7 @@ namespace Game.Character
             }
             else
             {
-                return playerInputController.CharacterCamera.transform.position + playerInputController.CharacterCamera.transform.forward * 100;
+                return playerInputController.CharacterCameraController.transform.position + playerInputController.CharacterCameraController.transform.forward * 100;
             }
         }
 

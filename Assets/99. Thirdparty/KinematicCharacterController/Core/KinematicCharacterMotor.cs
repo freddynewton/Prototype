@@ -186,12 +186,12 @@ namespace KinematicCharacterController
         /// <summary>
         /// Contains the previous grounding information
         /// </summary>
-        [System.NonSerialized]
+        [NonSerialized]
         public CharacterTransientGroundingReport LastGroundingStatus = new CharacterTransientGroundingReport();
         /// <summary>
         /// Specifies the LayerMask that the character's movement algorithm can detect collisions with. By default, this uses the rigidbody's layer's collision matrix
         /// </summary>
-        [System.NonSerialized]
+        [NonSerialized]
         public LayerMask CollidableLayers = -1;
 
         /// <summary>

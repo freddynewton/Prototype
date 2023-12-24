@@ -13,6 +13,7 @@ namespace Game.Data.CharacterMovementData
         public Vector3 GroundNormal;
         public Vector3 InnerGroundNormal;
         public Vector3 OuterGroundNormal;
+        public float TimeSinceGrounded;
 
         public void CopyFrom(CharacterGroundingReport groundingReport)
         {
@@ -22,6 +23,7 @@ namespace Game.Data.CharacterMovementData
             GroundNormal = groundingReport.GroundNormal;
             InnerGroundNormal = groundingReport.InnerGroundNormal;
             OuterGroundNormal = groundingReport.OuterGroundNormal;
+            TimeSinceGrounded = groundingReport.TimeSinceGrounded;
         }
     }
 }

@@ -6,7 +6,8 @@ namespace Game.Data.CharacterInputData
     {
         public float MoveAxisForward;
         public float MoveAxisRight;
-        public Quaternion CameraRotation;
+        public Transform CameraHolderTransform;
+        public float LookInputX;
         public bool JumpDown;
         public bool CrouchDown;
         public bool CrouchUp;
